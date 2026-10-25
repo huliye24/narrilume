@@ -1,32 +1,34 @@
-# Narrow development milestones
+# Native-first animation production roadmap
 
-## M0 — first code foundation
-- [x] Python project/shot data schema
-- [x] ComfyUI API workflow and explicit per-node binding adapter
-- [x] Sequential dispatch, prompt IDs, local state and output retrieval
-- [x] Optional image-to-video reference image upload
-- [x] FFmpeg video normalization and MP4 concatenation
-- [ ] Local hardware acceptance
+## v0.2 now
+- [x] Keep project/shot JSON and MP4 assembly.
+- [x] Native Python Wan T2V/I2V adapter with offline local path.
+- [x] CPU-offload option, one GPU process, sequential jobs.
+- [x] Model configuration + per-shot input signature.
+- [x] FFprobe technical acceptance + explicit retries.
+- [x] Offline tests and native-first CLI commands.
+- [ ] GPU end-to-end A10 validation and actual human quality review.
 
-## M1 — first GPU validation
-- [ ] Install verified local video model on AWS A10
-- [ ] Export real ComfyUI API-format workflow with saved video output
-- [ ] Render two shots to files and produce playable MP4
-- [ ] Stop/restart render and validate recovery
-- [ ] Record VRAM, time per accepted second and creative quality
+## M1: Real local inference
+- [ ] Install a CUDA-compatible PyTorch + Diffusers environment on an A10 instance.
+- [ ] Download a licensed, verified Diffusers checkpoint and record immutable revision/size.
+- [ ] Confirm one 81-frame MP4 and record memory, time, and source provenance.
+- [ ] Render two scenes and compose a playable film.
+- [ ] Determine whether the A10 is adequate or whether quantization/alternative model is necessary.
 
-## M2 — industrial reliability
-- [ ] Content hashes / invalidation of changed shots or model workflow
-- [ ] Explicit retry and in-flight duplicate submission controls
-- [ ] Immutable provenance: checkpoint, source art, nodes, parameters
-- [ ] File locking, schema migrations and corruption recovery
-- [ ] Human shot approval / retake history and automated QC
-- [ ] GPU telemetry and standardized experiment reports
+## M2: Reliability
+- [ ] Exclusive local process lock and recoverable worker lease.
+- [ ] Verify checkpoint SHA-256 manifest; record software/CUDA versions.
+- [ ] Preserve historical take versions; never overwrite an approved clip.
+- [ ] Full-frame decode and automatic output QC.
+- [ ] GPU resource telemetry, render logs, robust OOM handling.
+- [ ] Character/style bibles and human acceptance records.
 
-## M3 — studio layer
-- [ ] Series / episode / scene hierarchy and character bible
-- [ ] First-last-frame and controlled motion model adapters
-- [ ] Multi-worker GPU scheduling and capacity budgets
-- [ ] Review UI / material library / release packages
+## M3: Scalable studio
+- [ ] Pluggable LTX / DiffSynth adapter after independent validation.
+- [ ] Series → episode → sequence → shot → take hierarchy.
+- [ ] Asset catalog, licensing and reference permission tracking.
+- [ ] Multi-GPU scheduling and job isolation.
+- [ ] Approval UI and archival/release packages.
 
-We prioritize usable animation output and reproducibility over expanding the surface area.
+Rule: ship usable animation seconds and recoverable jobs; don't import entire GitHub codebases by default.
