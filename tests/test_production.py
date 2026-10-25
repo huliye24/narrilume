@@ -102,13 +102,13 @@ def test_timeout_keeps_existing_prompt_for_resume(tmp_path):
             return {}
 
         def submit(self, graph):
-            self.submitted += 1
+            type(self).submitted += 1
             return "persisted-prompt-id"
 
         def wait(self, prompt_id, timeout, poll_interval):
             assert prompt_id == "persisted-prompt-id"
             if self.timeout_once:
-                self.timeout_once = False
+                type(self).timeout_once = False
                 raise TimeoutError("render still running")
             return {"outputs": {}, "status": {"completed": True}}
 
