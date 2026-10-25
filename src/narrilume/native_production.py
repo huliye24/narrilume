@@ -51,7 +51,7 @@ def native_plan(project_path: str | Path, model_path: str | Path) -> dict[str, A
         "shots": [
             {
                 "id": s.id,
-                "seconds": round(s.frames / project.fps, 3),
+                "seconds": s.frames / project.fps,
                 "frames": s.frames,
                 "seed": s.seed,
                 "fingerprint": shot_fingerprint(project, s, model),
