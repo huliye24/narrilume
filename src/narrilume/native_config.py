@@ -8,7 +8,7 @@ from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Any
 
-from .schema import Project, Shot, resolve_reference
+from .schema import Project, resolve_reference
 
 BACKENDS = {"wan-t2v", "wan-i2v"}
 
