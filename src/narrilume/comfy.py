@@ -130,12 +130,33 @@ class ComfyClient:
         suffix = Path(artifact["filename"]).suffix.lower()
         destination = destination.with_suffix(suffix)
         destination.parent.mkdir(parents=True, exist_ok=True)
-        payload = self._request("GET", "/view?" + query)
-        if not payload or len(payload) > 2 * 1024**3:
-            raise ComfyError("video was empty or exceeded the 2 GiB scene limit")
         temp = destination.with_name(destination.name + ".part")
-        temp.write_bytes(payload)
-        temp.replace(destination)
+        request = urllib.request.Request(
+            self.base_url + "/view?" + query,
+            headers={"Accept": "application/octet-stream"},
+            method="GET",
+        )
+        received = 0
+        try:
+            with urllib.request.urlopen(request, timeout=self.request_timeout) as response:
+                with temp.open("wb") as handle:
+                    while True:
+                        chunk = response.read(1024 * 1024)
+                        if not chunk:
+                            break
+                        received += len(chunk)
+                        if received > 2 * 1024**3:
+                            raise ComfyError("video exceeded the 2 GiB scene limit")
+                        handle.write(chunk)
+            if not received:
+                raise ComfyError("video artifact is empty")
+            temp.replace(destination)
+        except urllib.error.HTTPError as exc:
+            raise ComfyError(f"Could not download ComfyUI video: HTTP {exc.code}") from exc
+        except urllib.error.URLError as exc:
+            raise ComfyError(f"ComfyUI video download failed: {exc}") from exc
+        finally:
+            temp.unlink(missing_ok=True)
         return {"file": str(destination), "remote_filename": artifact["filename"]}
 
 
