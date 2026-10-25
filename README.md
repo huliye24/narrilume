@@ -1,82 +1,82 @@
 # Narrilume · 时光纪
 
-**Rongjing Culture | 荣景文川 — AI Animation Production System**
+**荣景文川｜RONGJING CULTURE — local AI animation production software**
 
-Narrilume is a **local-first animation production orchestrator**, based on ComfyUI and locally deployed video models. It takes ordered storyboard shots, sends them to a GPU video workflow, retrieves the resulting animation clips and produces one MP4 film.
+Narrilume is an **animation production system**: scripts and storyboards → individual animated shots → reviewed clips → final films. Its primary backend now calls **local video models directly through Python / Hugging Face Diffusers**. **ComfyUI is NOT required** and is kept only as an opt-in legacy compatibility adapter.
 
-This repository does not implement a general image-generation product, chatbot, music generator or video editor. ComfyUI remains the inference engine; Narrilume manages animation production.
+No hosted GPU inference API, automatic third-party SaaS connection or checkpoint download is used by the native renderer.
 
-**Current status: v0.1 foundation**. Code has been committed, but a working GPU model, verified ComfyUI video workflow, deployment and hardware acceptance are not bundled.
+## Engineering status
 
-## Pipeline
+**v0.2 local-inference foundation** — implemented code, not yet validated on AWS A10. GPU weights and production video clips are never committed to Git.
 
-Story & character/style bible → Shot manifest → ComfyUI API workflow → local GPU generation → animation clips → review / retakes → MP4 master & production ledger.
+Core capabilities:
+- Versioned project and shot manifests; prompts, seeds, frame counts and optional reference keyframes.
+- Native Wan text-to-video / image-to-video adapter, with local-only model paths and lazy CUDA loading.
+- GPU jobs sequential by default; reusable loaded pipeline per run.
+- Per-shot state, input fingerprints, explicit retry for failed/interrupted work, atomic video output.
+- FFprobe technical acceptance for real video streams before marking success.
+- FFmpeg normalization and MP4 film assembly in storyboard order.
+- Offline test/CI without downloading weights or requiring ComfyUI.
 
-One shot runs at a time on the initial AWS NVIDIA A10 GPU. Model weights and outputs are never committed to GitHub.
+**First target:** single NVIDIA A10 (24 GiB VRAM); actual model fit, latency and quality must be measured. Start with Wan2.2 TI2V 5B or a checkpoint compatible with the chosen Diffusers backend.
 
 ## Install
 
-Python 3.10+, ComfyUI installed separately and FFmpeg for film assembly.
+Python >=3.10, FFmpeg/FFprobe for video output. Install the base package anywhere:
 
 ~~~bash
-git clone https://github.com/huliye24/narrilume
+git clone https://github.com/huliye24/narrilume.git
 cd narrilume
-python -m venv .venv
-source .venv/bin/activate
 python -m pip install -e .
 narrilume --help
 ~~~
 
-Windows PowerShell activation: '.venv\Scripts\Activate.ps1'.
-
-## First animation
-
-1. Install ComfyUI, a compatible local **video-generation** model and a ComfyUI workflow with a **saved video output**. See docs/COMFYUI_SETUP.md.
-2. Export ComfyUI workflow JSON in **API format** (not the normal editor workflow format).
-3. Copy and modify examples/first-short/bindings.example.json to point at the exact IDs and input names in YOUR exported workflow. The example numbers are illustrative.
-4. Edit examples/first-short/project.json (a two-shot paper-boat animation).
-5. Validate, run, resume and assemble:
+On the GPU host, install a CUDA-compatible PyTorch build appropriate for the driver, then the optional Wan dependencies:
 
 ~~~bash
+python -m pip install -e '.[wan]'
+~~~
+
+Download a **Diffusers-formatted** checkpoint separately to a local disk path. Review model license terms, provenance and deployment resource requirements first. The native renderer strictly checks for a local directory with 'model_index.json' and never auto-downloads a model.
+
+## Generate your first short film (no ComfyUI)
+
+Edit the absolute local path and checkpoint revision in 'examples/first-short/native-model.example.json'. The two-shot example is text-to-video and declares frames=81, 832x480, 16 fps.
+
+~~~bash
+# Does not load models or use a GPU
 narrilume validate examples/first-short/project.json \
-  --workflow /path/to/video.api.json \
-  --bindings /path/to/bindings.json
+  --model examples/first-short/native-model.example.json
 
-narrilume health --comfy-url http://127.0.0.1:8188
+narrilume plan examples/first-short/project.json \
+  --model examples/first-short/native-model.example.json
 
+# On the GPU host with weights and FFmpeg/FFprobe installed
 narrilume render examples/first-short/project.json \
-  --workflow /path/to/video.api.json \
-  --bindings /path/to/bindings.json \
+  --model examples/first-short/native-model.example.json \
   --output runs/first-short
 
 narrilume status --output runs/first-short
 narrilume assemble examples/first-short/project.json --output runs/first-short
 ~~~
 
-Generated file: 'runs/first-short/first_short.mp4'. Render metadata, ComfyUI prompt IDs and shot clips are saved under the same run directory. Restart the render command to reuse completed shots.
+Output is 'runs/first-short/first_short.mp4'. Rendering saves each clip separately and skips previously validated, unchanged clips. If a process crashes while generating a clip, inspect state and manually choose '--retry-failed'. This is **at-least-once** rendering, not a distributed exactly-once queue.
 
-## Workflow bindings
+For image-guided animation, choose '"backend": "wan-i2v"' with a matching **local I2V-compatible** Diffusers checkpoint and a shot '"reference_image": "local-image.png"'. A T2V-only checkpoint does not become I2V just by changing the config flag. Compatibility must be verified per model; local asset files may not escape the project folder.
 
-A bindings file maps named fields to the exact node and input in your video-model ComfyUI API workflow. Example:
+## Native model contract
 
-~~~json
-{
-  "positive_prompt": {"node": "6", "input": "text"},
-  "seed": {"node": "3", "input": "seed"},
-  "frames": {"node": "15", "input": "length"}
-}
-~~~
+See docs/NATIVE_INFERENCE.md for backend configuration, A10 sizing, supported model types, dependencies and licensing. Never assume a model checkpoint is small enough for one A10; enable CPU offload and benchmark an actual short clip. The config's 'revision' identifies the exact weights you installed; **update it when weights change** so completed outputs are invalidated correctly.
 
-Supported keys: 'positive_prompt' (required), 'negative_prompt', 'seed', 'frames', 'fps', 'width', 'height', 'reference_image'. Unbound parameters remain as configured in the ComfyUI workflow.
+Other useful sources: Wan2.2, Hugging Face Diffusers, PyTorch, Accelerate, DiffSynth-Studio and LTX-Video (future backend candidate). We integrate through documented Python APIs; we do **not** copy their source files or weights into our Git repository.
 
-'comfy_url' defaults to 'http://127.0.0.1:8188' (also configurable with 'NARRILUME_COMFY_URL'). Uses the official ComfyUI HTTP API. No third-party cloud inference API is silently invoked.
+## Production scope
 
-Read docs/ARCHITECTURE.md, docs/ANIMATION_PROTOCOL.md, docs/ROADMAP.md and AGENTS.md before extending the system.
+Series → Episodes → Sequences → Shots → Takes → approved clips → final master is the long-term shape. v0.2 implements Project → Shots → Clips plus reproducible shot state. UI, multiple GPU workers, character/style approval and industrial scheduler are later milestones.
 
-## Current limits
+The **ComfyUI adapter remains available only through 'comfy-validate', 'comfy-health', and 'comfy-render'** for any legacy runs. Never share a run directory across native and ComfyUI execution. Main CLI commands use local inference.
 
-The v0.1 ledger is local JSON, for **one orchestrator process per output directory**. There is no full model-checkpoint lockfile, approval UI, multi-GPU scheduling, clip fingerprint invalidation or guaranteed exactly-once dispatch yet. Do not claim that this version is a production-ready animation studio until A10 GPU acceptance has passed.
-
-Software: GNU GPL v3, see LICENSE. Model weights, assets and production outputs carry their own license terms; verify commercial permission separately.
+Software: GPL-3.0-only. Model checkpoints and third-party creative assets have separate license terms; check commercial terms independently.
 
 **Narrilume / 时光纪 — a Rongjing Culture project.**
