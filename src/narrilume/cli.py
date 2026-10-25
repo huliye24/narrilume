@@ -41,6 +41,7 @@ def _parser() -> argparse.ArgumentParser:
         "--poll-interval", type=float, default=float(os.getenv("NARRILUME_POLL_INTERVAL", "3"))
     )
     render_command.add_argument("--continue-on-error", action="store_true")
+    render_command.add_argument("--retry-failed", action="store_true")
 
     join = commands.add_parser("assemble", help="stitch completed animation clips into MP4")
     join.add_argument("project")
@@ -72,7 +73,8 @@ def main(argv: list[str] | None = None) -> int:
                 raise ValueError("timeout and poll-interval must be positive")
             state = render(
                 args.project, args.workflow, args.bindings, args.output,
-                args.comfy_url, args.timeout, args.poll_interval, args.continue_on_error
+                args.comfy_url, args.timeout, args.poll_interval,
+                args.continue_on_error, args.retry_failed
             )
             counts = {
                 key: sum(shot.get("status") == key for shot in state["shots"].values())
