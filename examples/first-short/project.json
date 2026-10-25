@@ -1,0 +1,24 @@
+{
+  "schema_version": "0.1",
+  "project_id": "first_short",
+  "title": "First Short / 第一支短片",
+  "fps": 16,
+  "width": 832,
+  "height": 480,
+  "shots": [
+    {
+      "id": "shot_001",
+      "prompt": "A little paper boat glides along a quiet stream, animated film, gentle camera tracking, consistent art direction, coherent motion, no cuts",
+      "negative_prompt": "flicker, inconsistent character, deformation, subtitles, watermark",
+      "seed": 2026102501,
+      "frames": 81
+    },
+    {
+      "id": "shot_002",
+      "prompt": "The same paper boat floats under a stone bridge, animated film, slow camera movement, coherent water motion, no cuts",
+      "negative_prompt": "flicker, warped object, subtitles, watermark",
+      "seed": 2026102502,
+      "frames": 81
+    }
+  ]
+}
