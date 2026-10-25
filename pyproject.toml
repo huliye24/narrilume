@@ -4,8 +4,8 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "narrilume"
-version = "0.1.0"
-description = "Local-first, reproducible AI animation production orchestrator for ComfyUI."
+version = "0.2.0"
+description = "Offline-first animation production with direct local video-model inference"
 readme = "README.md"
 requires-python = ">=3.10"
 license = "GPL-3.0-only"
@@ -13,6 +13,9 @@ authors = [{name = "Rongjing Culture"}]
 dependencies = []
 
 [project.optional-dependencies]
+# GPU host only. Install a CUDA-compatible torch build based on the server driver.
+# Keep native GPU dependencies out of CPU-only CI.
+wan = ["torch>=2.4", "diffusers>=0.35", "transformers>=4.49", "accelerate>=1.1", "imageio[ffmpeg]>=2.31", "ftfy>=6.0"]
 dev = ["pytest>=8", "ruff>=0.7"]
 
 [project.scripts]

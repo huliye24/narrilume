@@ -1,0 +1,10 @@
+{
+  "schema_version": "0.1",
+  "backend": "wan-t2v",
+  "model_path": "/ABSOLUTE/PATH/TO/LOCAL/DIFFUSERS/Wan2.2-TI2V-5B",
+  "revision": "REPLACE-WITH-VERIFIED-MODEL-SNAPSHOT-ID",
+  "dtype": "bfloat16",
+  "cpu_offload": true,
+  "steps": 30,
+  "guidance_scale": 5.0
+}
