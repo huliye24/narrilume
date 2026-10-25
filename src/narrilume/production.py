@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 import json
 import os
 import shutil
@@ -18,6 +19,27 @@ from .workflow import load_bindings, load_workflow, render_workflow, validate_bi
 
 def _timestamp() -> str:
     return datetime.now(timezone.utc).isoformat()
+
+
+def _shot_signature(
+    project: Project, shot: Any, workflow: dict[str, Any],
+    bindings: dict[str, dict[str, str]]
+) -> str:
+    """Invalidate cached video whenever a source shot or workflow changes."""
+    source = resolve_reference(project, shot)
+    reference_hash = hashlib.sha256(source.read_bytes()).hexdigest() if source else None
+    identity = {
+        "project_id": project.id,
+        "fps": project.fps,
+        "width": project.width,
+        "height": project.height,
+        "shot": vars(shot),
+        "reference_sha256": reference_hash,
+        "workflow": workflow,
+        "bindings": bindings,
+    }
+    payload = json.dumps(identity, ensure_ascii=False, sort_keys=True).encode("utf-8")
+    return hashlib.sha256(payload).hexdigest()
 
 
 def _write_json_atomic(path: Path, value: dict[str, Any]) -> None:
@@ -54,6 +76,7 @@ def render(
     timeout: float = 3600,
     poll_interval: float = 3,
     continue_on_error: bool = False,
+    retry_failed: bool = False,
 ) -> dict[str, Any]:
     project = load_project(project_path)
     workflow = load_workflow(workflow_path)
@@ -66,14 +89,31 @@ def render(
     client = ComfyClient(comfy_url)
     client.health()
     for shot in project.shots:
+        signature = _shot_signature(project, shot, workflow, bindings)
         previous = state["shots"].get(shot.id, {})
+        previous_status = previous.get("status")
+        same_inputs = previous.get("signature") == signature
+        if previous_status in {"queued", "submitting"} and not same_inputs:
+            raise ValueError(
+                f"{shot.id}: inputs changed while job is in flight; reconcile state.json first"
+            )
         video = previous.get("video")
-        if previous.get("status") == "completed" and isinstance(video, str):
-            if (output / video).is_file() and (output / video).stat().st_size > 0:
+        if same_inputs and previous_status == "completed" and isinstance(video, str):
+            existing = (output / video).resolve()
+            if existing.is_relative_to(output) and existing.is_file() and existing.stat().st_size:
                 continue
+        if same_inputs and previous_status in {"failed", "submitting"} and not retry_failed:
+            raise ValueError(
+                f"{shot.id}: previous job requires review; pass --retry-failed to resubmit "
+                "(may duplicate work if prior submission reached ComfyUI)"
+            )
 
-        record = dict(previous)
+        record = dict(previous) if same_inputs else {}
         record.setdefault("attempts", 0)
+        record["signature"] = signature
+        if retry_failed and record.get("status") in {"failed", "submitting"}:
+            record.pop("prompt_id", None)
+            record["status"] = "retrying"
         try:
             if record.get("status") != "queued" or not record.get("prompt_id"):
                 reference_path = resolve_reference(project, shot)
@@ -103,7 +143,15 @@ def render(
                     "error": None,
                 }
             )
-        except (ComfyError, TimeoutError, OSError, ValueError) as exc:
+        except TimeoutError as exc:
+            # ComfyUI may still be rendering. Keep the prompt ID and poll on next run.
+            record["status"] = "queued"
+            record["error"] = str(exc)
+            record["updated_at"] = _timestamp()
+            state["shots"][shot.id] = record
+            _write_json_atomic(state_path, state)
+            raise
+        except (ComfyError, OSError, ValueError) as exc:
             record["status"] = "failed"
             record["error"] = str(exc)
             record["updated_at"] = _timestamp()
